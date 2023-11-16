@@ -1,0 +1,407 @@
+package timeuse
+
+import (
+	"fmt"
+	"strconv"
+	"testing"
+	"time"
+	"timeuse/locale"
+)
+
+// 根据给定的method和可变参数vals生成一个错误消息字符串。
+func ErrorF(method string) func(...interface{}) string {
+	t := `[%s] 测试失败`
+	return func(vals ...interface{}) string {
+		newVals := []interface{}{method}
+		newVals = append(newVals, vals...)
+		if len(vals) > 0 {
+			t += ", 参数：("
+			for i := 0; i < len(vals)-1; i++ { // 为什么要减去1，不显示最后一个参数，因为在最后的输出时显示的原因吗？-------！！！！！！！！！！！！！！！！！！！！！！
+				t += "%v, "
+			}
+			t += ")"
+		}
+
+		return fmt.Sprintf(t, newVals...)
+	}
+}
+
+func TestNow(t *testing.T) {
+	f := ErrorF("Now")
+
+	d := Now()
+	fmt.Println(d.Day)
+	if d.Day != time.Now().Day() {
+		t.Errorf(f())
+	}
+}
+
+func TestParse(t *testing.T) {
+	f := ErrorF("Parse")
+	p1 := "2021-07-28 12:26:36"
+	d, _ := Parse(p1)
+
+	fmt.Println(d.Year)
+	if d.Year != 2021 {
+		t.Errorf(f(p1))
+	}
+}
+
+func TestUnix(t *testing.T) {
+	param1 := 1627542959340
+	d, _ := Unix(param1)
+	f := ErrorF("Unix")
+	fmt.Println(d.Year, d.Minute)
+	if d.Year != 2021 && d.Minute != 15 {
+		t.Errorf(f(param1))
+	}
+
+	param2 := 162754295934 // 14bit
+	_, err := Unix(param2)
+	fmt.Println(err)
+	if err == nil {
+		t.Error("Unix未捕获错误", 162754295934)
+	}
+}
+
+func TestDayAdd(t *testing.T) {
+	p1 := "2021-01-31 19:02:59"
+	d, _ := Parse(p1)
+
+	f := ErrorF("Day.Add")
+	if d.Add(1, Year).Year != 2022 {
+		t.Errorf(f(p1), "Add 1 Year")
+	}
+	addMonth := d.Add(1, Month)
+	if addMonth.Month != 2 && addMonth.Day != 28 { // 因为二月的最长天数是28天
+		t.Errorf(f(p1), "Add 1 Month")
+	}
+	if d.Add(1, Day).Day != 1 { // 1.31 + 1 = 2.1
+		t.Errorf(f(p1), "Add 1 Day")
+	}
+	if d.Add(1, Hour).Hour != 20 {
+		t.Errorf(f(p1), "Add 1 Hour")
+	}
+	if d.Add(1, Minute).Minute != 3 {
+		t.Errorf(f(p1), "Add 1 Minute")
+	}
+	if d.Add(1, Second).Second != 0 { // 59 + 1 = 1m0s
+		t.Errorf(f(p1), "Add 1 Second")
+	}
+
+	d2 := List([]int{2020, 1, 31})
+	if d2.Add(1, Month).Day != 29 {
+		t.Error(f("2020, 1, 31"))
+	}
+	d3 := List([]int{2020, 2, 29})
+	if d3.Add(1, Year).Day != 28 {
+		t.Error(f("2020, 2, 29"))
+	}
+}
+
+func TestDaySubtract(t *testing.T) {
+	p1 := "2021-01-31 19:02:00"
+	d, _ := Parse(p1)
+
+	f := ErrorF("Day.Subtract")
+	if d.Subtract(1, Year).Year != 2020 {
+		t.Error(f(p1), "Add 1 Year")
+	}
+	if d.Subtract(1, Month).Month != 12 {
+		t.Errorf(f(p1), "Add 1 Month")
+	}
+	if d.Subtract(1, Day).Day != 30 {
+		t.Errorf(f(p1), "Add 1 Day")
+	}
+	if d.Subtract(1, Hour).Hour != 18 {
+		t.Errorf(f(p1), "Add 1 Hour")
+	}
+	if d.Subtract(1, Minute).Minute != 1 {
+		t.Errorf(f(p1), "Add 1 Minute")
+	}
+	if d.Subtract(1, Second).Second != 59 {
+		t.Errorf(f(p1), "Add 1 Second")
+	}
+
+	d2 := List([]int{2020, 3, 31})
+	if d2.Subtract(1, Month).Day != 29 {
+		t.Error(f("2020, 1, 31"))
+	}
+	d3 := List([]int{2020, 2, 29})
+	if d3.Subtract(1, Year).Day != 28 {
+		t.Error(f("2020, 2, 29"))
+	}
+}
+
+func TestDayFormat(t *testing.T) {
+	d, _ := Parse("2021-07-30 08:08:08")
+	f := ErrorF("Day.Parse")
+	p1 := "YYYY年MM月DD日，HH时mm分ss秒"
+	if d.Format(p1) != "2021年07月30日，08时08分08秒" {
+		t.Error(f(p1))
+	}
+	p2 := "SSS,MMMM,dd"
+	if d.Format(p2) != "000,July,Friday" {
+		t.Error(f(p2))
+	}
+	p3 := "YY年M月D日，d，H时m分s秒"
+	if d.Format(p3) != "21年7月30日，5，8时8分8秒" {
+		t.Error(f(p3))
+	}
+	d2, _ := Parse("2021-07-30 14:08:08")
+	p4 := "hh时h时"
+	if d2.Format(p4) != "02时2时" {
+		t.Error(f(p4))
+	}
+}
+
+func TestTime(t *testing.T) {
+	if Now().Time().Day() != time.Now().Day() {
+		t.Error("daygo时间测试失败")
+	}
+}
+
+func TestLocale(t *testing.T) {
+	Locale(locale.ZH_CN)
+	f := ErrorF("Locale")
+	d, _ := Parse("2021-07-30 10:23:59")
+	p1 := "MMMM,dd"
+
+	if d.Format(p1) != "七月,星期五" {
+		t.Error(f(p1))
+	}
+}
+
+func TestDayStartOf(t *testing.T) {
+	d, _ := Parse("2021-07-30 10:23:59")
+
+	sfYear := d.StartOf(Year)
+	if !(sfYear.Year == 2021 &&
+		sfYear.Month == 1 &&
+		sfYear.Day == 1 &&
+		sfYear.Hour == 0 &&
+		sfYear.Minute == 0 &&
+		sfYear.Second == 0) {
+		t.Error("Day.StartOf测试失败：StartOf Year")
+	}
+	fmt.Println(sfYear)
+	sfMonth := d.StartOf(Month)
+	if !(sfMonth.Year == 2021 &&
+		sfMonth.Month == 7 &&
+		sfMonth.Day == 1 &&
+		sfMonth.Hour == 0 &&
+		sfMonth.Minute == 0 &&
+		sfMonth.Second == 0) {
+		t.Error("Day.StartOf测试失败：StartOf Month")
+	}
+	fmt.Println(sfMonth)
+	sfDay := d.StartOf(Day)
+	if !(sfDay.Year == 2021 &&
+		sfDay.Month == 7 &&
+		sfDay.Day == 30 &&
+		sfDay.Hour == 0 &&
+		sfDay.Minute == 0 &&
+		sfDay.Second == 0) {
+		t.Error("Day.StartOf测试失败：StartOf Day")
+	}
+	fmt.Println(sfDay)
+	sfHour := d.StartOf(Hour)
+	if !(sfHour.Year == 2021 &&
+		sfHour.Month == 7 &&
+		sfHour.Day == 30 &&
+		sfHour.Hour == 10 &&
+		sfHour.Minute == 0 &&
+		sfHour.Second == 0) {
+		t.Error("Day.StartOf测试失败：StartOf Hour")
+	}
+	fmt.Println(sfHour)
+	sfMinute := d.StartOf(Minute)
+	if !(sfMinute.Year == 2021 &&
+		sfMinute.Month == 7 &&
+		sfMinute.Day == 30 &&
+		sfMinute.Hour == 10 &&
+		sfMinute.Minute == 23 &&
+		sfMinute.Second == 0) {
+		t.Error("Day.StartOf测试失败：StartOf Minute")
+	}
+	fmt.Println(sfMinute)
+	sfSecond := d.StartOf(Second)
+	unixNanoStr := fmt.Sprintf("%v", sfSecond.UnixNano)
+	unixNanoStr = unixNanoStr[len(unixNanoStr)-9:]
+	unixNano, _ := strconv.Atoi(unixNanoStr)
+	if !(sfSecond.Year == 2021 &&
+		sfSecond.Month == 7 &&
+		sfSecond.Day == 30 &&
+		sfSecond.Hour == 10 &&
+		sfSecond.Minute == 23 &&
+		sfSecond.Second == 59 &&
+		unixNano == 0) {
+		t.Error("Day.StartOf测试失败：StartOf Second")
+	}
+	fmt.Println(sfSecond)
+}
+
+func TestDayEndOf(t *testing.T) {
+	d, _ := Parse("2021-07-30 10:23:20")
+
+	ef := d.EndOf(Year)
+	if !(ef.Year == 2021 &&
+		ef.Month == 12 &&
+		ef.Day == 31 &&
+		ef.Hour == 23 &&
+		ef.Minute == 59 &&
+		ef.Second == 59) {
+		t.Error("Day.EndOf测试失败：EndOf Year")
+	}
+	ef = d.EndOf(Month)
+	if !(ef.Year == 2021 &&
+		ef.Month == 7 &&
+		ef.Day == 31 &&
+		ef.Hour == 23 &&
+		ef.Minute == 59 &&
+		ef.Second == 59) {
+		t.Error("Day.EndOf测试失败：EndOf Month")
+	}
+	ef = d.EndOf(Day)
+	if !(ef.Year == 2021 &&
+		ef.Month == 7 &&
+		ef.Day == 30 &&
+		ef.Hour == 23 &&
+		ef.Minute == 59 &&
+		ef.Second == 59) {
+		t.Error("Day.EndOf测试失败：EndOf Day")
+	}
+	ef = d.EndOf(Hour)
+	if !(ef.Year == 2021 &&
+		ef.Month == 7 &&
+		ef.Day == 30 &&
+		ef.Hour == 10 &&
+		ef.Minute == 59 &&
+		ef.Second == 59) {
+		t.Error("Day.EndOf测试失败：EndOf Hour")
+	}
+	ef = d.EndOf(Minute)
+	if !(ef.Year == 2021 &&
+		ef.Month == 7 &&
+		ef.Day == 30 &&
+		ef.Hour == 10 &&
+		ef.Minute == 23 &&
+		ef.Second == 59) {
+		t.Error("Day.EndOf测试失败：EndOf Minute")
+	}
+	ef = d.EndOf(Second)
+	unixNanoStr := fmt.Sprintf("%v", ef.UnixNano)
+	unixNanoStr = unixNanoStr[len(unixNanoStr)-9:]
+	unixNano, _ := strconv.Atoi(unixNanoStr)
+	if !(ef.Year == 2021 &&
+		ef.Month == 7 &&
+		ef.Day == 30 &&
+		ef.Hour == 10 &&
+		ef.Minute == 23 &&
+		ef.Second == 20 &&
+		unixNano == 999999999) {
+		t.Error("Day.EndOf测试失败：EndOf Second")
+	}
+}
+
+func TestDaySet(t *testing.T) {
+	d, _ := Parse("2021-02-17 10:23:20") // Wednesday
+	f := ErrorF("Day.Set")
+	if d.Set(2024, Year).Year != 2024 || d.SetYear(2024).Year != 2024 {
+		t.Error(f(), "Set Year")
+	}
+	if d.Set(3, Month).Month != 3 || d.SetMonth(3).Month != 3 {
+		t.Error(f(), "Set Month")
+	}
+	if d.Set(29, Day).Day != 1 || d.SetDay(29).Day != 1 {
+		t.Error(f(), "Set Day")
+	}
+	if d.Set(3, Hour).Hour != 3 || d.SetHour(3).Hour != 3 {
+		t.Error(f(), "Set Hour")
+	}
+	if d.Set(1, Minute).Minute != 1 || d.SetMinute(1).Minute != 1 {
+		t.Error(f(), "Set Minute")
+	}
+	if d.Set(59, Second).Second != 59 || d.SetSecond(59).Second != 59 {
+		t.Error(f(), "Set Second")
+	}
+	if d.Set(2, Weekday).Day != 16 || d.SetWeekDay(5).Day != 19 { // 数字是周几的意思
+		t.Error(f(), "Set Weekday")
+	}
+}
+
+func TestIsLeapYear(t *testing.T) {
+	f := ErrorF("IsLeapYear")
+	if IsLeapYear(2021) != false && IsLeapYear(2100) != false {
+		t.Error(f(2021))
+		t.Error(f(2100))
+	}
+	if !IsLeapYear(2020) && !IsLeapYear(2400) {
+		t.Error(f(2020))
+		t.Error(f(2400))
+	}
+}
+
+func TestFillZero(t *testing.T) {
+	str1 := fillZero(8)
+	str2 := fillZero(12)
+	f := ErrorF("fill zero")
+	if str1 != "08" {
+		t.Error(f(8))
+	}
+	if str2 != "12" {
+		t.Error(f(12))
+	}
+}
+
+func TestDaySecondAfterUnixNano(t *testing.T) {
+	tim := time.Unix(0, 1627637214376669500)
+	d := New(tim)
+	un := d.SecondAfterUnixNano()
+	if un != 376669500 {
+		t.Error("SecondAfterUnixNano测试失败")
+	}
+}
+
+func TestDayDaysInMonth(t *testing.T) {
+	d1 := List([]int{2021, 8})
+	d2 := List([]int{2021, 2})
+	d3 := List([]int{2020, 2})
+	f := ErrorF("day.DaysInMonth")
+
+	if d1.DaysInMonth() != 31 {
+		t.Error(f(), "2021, 8")
+	}
+	if d2.DaysInMonth() != 28 {
+		t.Error(f(), "2021, 2")
+	}
+	fmt.Println(d3)
+	fmt.Println(d3.DaysInMonth())
+	if d3.DaysInMonth() != 29 {
+		t.Error(f(), "2020, 2")
+	}
+}
+
+func TestDayUtCAndLocal(t *testing.T) {
+	f := ErrorF("day.UTC,day.Local")
+	u := Now().UTC()
+	l := Now().Local()
+	if u.time.Hour() != time.Now().UTC().Hour() {
+		t.Error(f())
+	}
+	if l.time.Hour() != time.Now().Local().Hour() {
+		t.Error(f())
+	}
+}
+
+func TestIntInSlice(t *testing.T) {
+	f := ErrorF("intInSlice")
+	ints := []int{1, 2, 3, 4}
+
+	if intInSlice(ints, 3) != true {
+		f(ints, 2)
+	}
+	if intInSlice(ints, 5) != false {
+		f(ints, 5)
+	}
+}
