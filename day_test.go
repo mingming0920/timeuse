@@ -2,10 +2,10 @@ package timeuse
 
 import (
 	"fmt"
+	"github.com/mingming0920/timeuse/locale"
 	"strconv"
 	"testing"
 	"time"
-	"timeuse/locale"
 )
 
 // 根据给定的method和可变参数vals生成一个错误消息字符串。

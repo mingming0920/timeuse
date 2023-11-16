@@ -3,9 +3,9 @@ package timeuse
 import (
 	"errors"
 	"fmt"
+	"github.com/mingming0920/timeuse/locale"
 	"strconv"
 	"time"
-	"timeuse/locale"
 )
 
 type D struct {
